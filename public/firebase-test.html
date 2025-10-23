@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Manual Firebase - Fetrans</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+        h1 { color: #667eea; margin-top: 0; }
+        h2 { color: #764ba2; border-bottom: 2px solid #764ba2; padding-bottom: 10px; }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .control-group {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success { background: #d1fae5; color: #065f46; }
+        .status.error { background: #fee2e2; color: #991b1b; }
+        .status.info { background: #dbeafe; color: #1e40af; }
+        .data-display {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        .instructions {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Teste Manual Firebase - Fetrans</h1>
+        
+        <div class="instructions">
+            <strong>⚠️ IMPORTANTE:</strong>
+            <ol>
+                <li>Abra o Console do Navegador (F12) para ver os logs</li>
+                <li>Configure os valores dos sensores abaixo</li>
+                <li>Clique em "Enviar para Firebase" para atualizar</li>
+                <li>Verifique os dados no <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a></li>
+            </ol>
+        </div>
+
+        <h2>📊 Controles dos Sensores</h2>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>💧 Vazão (L/min):</label>
+                <input type="number" id="vazao" value="15.5" step="0.1" min="0" max="50">
+                <small>0 - 50 L/min</small>
+            </div>
+            
+            <div class="control-group">
+                <label>📏 Altura (m):</label>
+                <input type="number" id="altura" value="0.85" step="0.01" min="0" max="2">
+                <small>0 - 2 m</small>
+            </div>
+            
+            <div class="control-group">
+                <label>🌡️ Temperatura (°C):</label>
+                <input type="number" id="temperatura" value="22.3" step="0.1" min="0" max="40">
+                <small>0 - 40 °C</small>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-primary" onclick="enviarDados()">📤 Enviar para Firebase</button>
+            <button class="btn-success" onclick="gerarAleatorio()">🎲 Gerar Valores Aleatórios</button>
+            <button class="btn-warning" onclick="simularFluxo()">▶️ Simular Fluxo Contínuo</button>
+            <button class="btn-danger" onclick="pararSimulacao()">⏹️ Parar Simulação</button>
+        </div>
+
+        <div id="status"></div>
+        
+        <h2>📡 Dados Atuais no Firebase</h2>
+        <div id="dados" class="data-display">Conectando...</div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        // Configuração do Firebase (mesma do .env)
+        const firebaseConfig = {
+            apiKey: "AIzaSyCpHO-Ia8VsKD_Kbo4vKttMhnnqFFRcOek",
+            authDomain: "tccamboni.firebaseapp.com",
+            databaseURL: "https://tccamboni-default-rtdb.firebaseio.com",
+            projectId: "tccamboni",
+            storageBucket: "tccamboni.firebasestorage.app",
+            messagingSenderId: "301270996685",
+            appId: "1:301270996685:web:aa25c2e45897b8bcc0fb84"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const markerRef = ref(database, 'markers/marker_0');
+
+        let intervalId = null;
+
+        // Monitorar dados em tempo real
+        onValue(markerRef, (snapshot) => {
+            const data = snapshot.val();
+            document.getElementById('dados').innerHTML = JSON.stringify(data, null, 2);
+            console.log('📊 Dados recebidos (marker_0):', data);
+        });
+
+        // Função para enviar dados
+        window.enviarDados = async function() {
+            const waterFlow = parseFloat(document.getElementById('vazao').value);
+            const waterLevel = parseFloat(document.getElementById('altura').value);
+            const temperature = parseFloat(document.getElementById('temperatura').value);
+
+            const dados = {
+                waterFlow,
+                waterLevel,
+                temperature,
+                humidity: 10,
+                isGateOpen: false,
+                latitude: -28.8077026605529,
+                longitude: -49.338491857051
+            };
+
+            try {
+                await set(markerRef, dados);
+                mostrarStatus('✅ Dados enviados com sucesso!', 'success');
+                console.log('✅ Enviado:', dados);
+            } catch (error) {
+                mostrarStatus('❌ Erro ao enviar: ' + error.message, 'error');
+                console.error('❌ Erro:', error);
+            }
+        };
+
+        // Gerar valores aleatórios
+        window.gerarAleatorio = function() {
+            document.getElementById('vazao').value = (Math.random() * 20 + 5).toFixed(1);
+            document.getElementById('altura').value = (Math.random() * 1.5 + 0.2).toFixed(2);
+            document.getElementById('temperatura').value = (Math.random() * 10 + 15).toFixed(1);
+            mostrarStatus('🎲 Valores aleatórios gerados!', 'info');
+        };
+
+        // Simular fluxo contínuo
+        window.simularFluxo = function() {
+            if (intervalId) {
+                mostrarStatus('⚠️ Simulação já está rodando!', 'error');
+                return;
+            }
+            
+            mostrarStatus('▶️ Simulação iniciada! Atualizando a cada 2 segundos...', 'success');
+            
+            intervalId = setInterval(() => {
+                gerarAleatorio();
+                enviarDados();
+            }, 2000);
+        };
+
+        // Parar simulação
+        window.pararSimulacao = function() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+                mostrarStatus('⏹️ Simulação parada!', 'info');
+            } else {
+                mostrarStatus('⚠️ Nenhuma simulação rodando!', 'error');
+            }
+        };
+
+        function mostrarStatus(mensagem, tipo) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status ' + tipo;
+            statusDiv.textContent = mensagem;
+            setTimeout(() => statusDiv.textContent = '', 5000);
+        }
+
+        console.log('🔥 Firebase Test Tool carregado!');
+        mostrarStatus('✅ Conectado ao Firebase!', 'success');
+    </script>
+</body>
+</html>

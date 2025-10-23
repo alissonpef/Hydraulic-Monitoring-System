@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurar Firebase - Fetrans</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+        h1 { color: #667eea; margin-top: 0; }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn-fix { background: #10b981; color: white; }
+        .btn-reset { background: #ef4444; color: white; }
+        .btn-info { background: #3b82f6; color: white; }
+        button:hover { opacity: 0.9; }
+        pre {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛠️ Configurar Firebase - Fetrans</h1>
+        
+        <div class="warning">
+            <strong>⚠️ PROBLEMA DETECTADO:</strong>
+            <p>O campo <code>waterLevel</code> pode estar vindo como <code>null</code> ou <code>"N/A"</code> no Firebase!</p>
+            <p>Isso faz com que todos os cálculos físicos (Pressão, Empuxo, etc.) fiquem em 0.00</p>
+        </div>
+
+        <h2>🔧 Soluções Automáticas</h2>
+        
+        <button class="btn-fix" onclick="corrigirWaterLevel()">
+            ✅ Corrigir waterLevel (definir para 2)
+        </button>
+        
+        <button class="btn-info" onclick="verificarDados()">
+            🔍 Verificar Dados Atuais
+        </button>
+        
+        <button class="btn-reset" onclick="resetarTudo()">
+            🔄 Resetar Todos os Dados
+        </button>
+
+        <div id="status"></div>
+        
+        <h2>📊 Estrutura Correta</h2>
+        <p>Os dados devem estar assim no Firebase:</p>
+        <pre>{
+  "markers": {
+    "marker_0": {
+      "humidity": 10,
+      "isGateOpen": false,
+      "latitude": -28.8077026605529,
+      "longitude": -49.338491857051,
+      "temperature": 10,
+      "waterFlow": 2,
+      "waterLevel": 2    ← DEVE SER NÚMERO!
+    }
+  }
+}</pre>
+
+        <h2>⚙️ Dados Atuais no Firebase</h2>
+        <div id="dados-atuais"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, set, get, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCpHO-Ia8VsKD_Kbo4vKttMhnnqFFRcOek",
+            authDomain: "tccamboni.firebaseapp.com",
+            databaseURL: "https://tccamboni-default-rtdb.firebaseio.com",
+            projectId: "tccamboni",
+            storageBucket: "tccamboni.firebasestorage.app",
+            messagingSenderId: "301270996685",
+            appId: "1:301270996685:web:aa25c2e45897b8bcc0fb84"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const markerRef = ref(database, 'markers/marker_0');
+
+        function mostrarStatus(mensagem, tipo = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = tipo === 'success' ? 'success' : 'warning';
+            statusDiv.innerHTML = `<strong>${mensagem}</strong>`;
+        }
+
+        async function mostrarDadosAtuais() {
+            try {
+                const snapshot = await get(markerRef);
+                const data = snapshot.val();
+                const dadosDiv = document.getElementById('dados-atuais');
+                
+                if (data) {
+                    dadosDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    
+                    // Verificar se waterLevel é número
+                    if (data.waterLevel === null || data.waterLevel === undefined || data.waterLevel === "N/A") {
+                        mostrarStatus('❌ waterLevel está NULO ou inválido! Clique em "Corrigir waterLevel"', 'warning');
+                    } else if (typeof data.waterLevel !== 'number') {
+                        mostrarStatus(`⚠️ waterLevel não é número! Tipo atual: ${typeof data.waterLevel}`, 'warning');
+                    } else {
+                        mostrarStatus(`✅ waterLevel está correto: ${data.waterLevel} m`, 'success');
+                    }
+                } else {
+                    dadosDiv.innerHTML = '<p>Nenhum dado encontrado!</p>';
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarStatus('❌ Erro ao carregar dados: ' + error.message, 'warning');
+            }
+        }
+
+        window.corrigirWaterLevel = async function() {
+            try {
+                await update(markerRef, {
+                    waterLevel: 2  // NÚMERO, não string!
+                });
+                mostrarStatus('✅ waterLevel corrigido para 2 metros!', 'success');
+                setTimeout(mostrarDadosAtuais, 500);
+            } catch (error) {
+                mostrarStatus('❌ Erro ao corrigir: ' + error.message, 'warning');
+            }
+        };
+
+        window.verificarDados = async function() {
+            mostrarStatus('🔍 Verificando dados...', 'info');
+            await mostrarDadosAtuais();
+        };
+
+        window.resetarTudo = async function() {
+            if (!confirm('Tem certeza que deseja resetar TODOS os dados?')) return;
+            
+            try {
+                await set(markerRef, {
+                    humidity: 65,
+                    isGateOpen: false,
+                    latitude: -28.8077026605529,
+                    longitude: -49.338491857051,
+                    temperature: 22,
+                    waterFlow: 15.5,
+                    waterLevel: 0.85  // NÚMERO!
+                });
+                mostrarStatus('✅ Dados resetados com valores padrão!', 'success');
+                setTimeout(mostrarDadosAtuais, 500);
+            } catch (error) {
+                mostrarStatus('❌ Erro ao resetar: ' + error.message, 'warning');
+            }
+        };
+
+        // Carregar dados ao iniciar
+        mostrarDadosAtuais();
+    </script>
+</body>
+</html>
